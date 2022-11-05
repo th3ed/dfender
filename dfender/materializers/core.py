@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Callable, get_type_hints, Union
+from functools import partial
+from typing import Callable, get_type_hints, Union, Any
 from abc import abstractproperty, abstractmethod
 from interface_meta import InterfaceMeta
 import pandas as pd
@@ -21,6 +22,10 @@ class MaterializerInterface(metaclass=InterfaceMeta):
         '''The dataframe class of the implemented library'''
         raise NotImplementedError
 
+    @abstractmethod
+    def map_partitions(self, df: Any, meta: Any, func: Callable) -> Any:
+        pass
+
     def to_type(self, cls: type[Union[pd.Series, pd.DataFrame]]):
         if cls == pd.Series:
             return self.series
@@ -28,9 +33,27 @@ class MaterializerInterface(metaclass=InterfaceMeta):
             return self.df
         raise ValueError(f"cls must be a pandas series or dataframe class, got {cls}")
 
-    @abstractmethod
+    def pandas_meta(self, df: Any) -> Union[pd.Series, pd.DataFrame]:
+        return df
+
+    def native_meta(self, df: pd.DataFrame) -> Any:
+        return df
+
     def map(self, func: Callable) -> Callable:
-        pass
+        def wrapper(_, df: Any, *args, **kwargs):
+            # Generate a new partial function which only needs the input df
+            func_ = partial(func, self, *args, **kwargs)
+
+            # Get the pandas equivalent metadata to pass to the function
+            meta_in = self.pandas_meta(df)
+
+            # Pass the meta through the function and then generate
+            # the appropriate native metadata
+            meta_out = self.native_meta(func_(meta_in))
+
+            # Map the function using the 
+            return self.map_partitions(df, meta_out, func_)
+        return wrapper
 
 class Materializer():
     def __init__(self):
