@@ -1,5 +1,5 @@
-from .core import distribute
+from .core import distributable
 
 __all__ = [
-    'distribute'
+    'distributable'
 ]

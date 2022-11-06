@@ -8,7 +8,6 @@ from pyspark.sql import SparkSession
 from interface_meta import override
 from .core import materializer, MaterializerInterface
 
-@materializer.register('spark-sql')
 class SparkSQLMaterializer(MaterializerInterface):
     @property
     def series(self) -> type[ps.DataFrame]:

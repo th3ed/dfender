@@ -1,10 +1,12 @@
 from __future__ import annotations
 from functools import partial
-from typing import Callable, get_type_hints, Union, Any
+from typing import Callable, Union, Any, Tuple, List
 from abc import abstractproperty, abstractmethod
 from interface_meta import InterfaceMeta
 import pandas as pd
-from multipledispatch.dispatcher import MethodDispatcher
+from multipledispatch import dispatch
+from multipledispatch.dispatcher import Dispatcher, MethodDispatcher
+import importlib
 
 class MaterializerInterface(metaclass=InterfaceMeta):
     '''Base Interface for Materializers'''
@@ -39,6 +41,12 @@ class MaterializerInterface(metaclass=InterfaceMeta):
     def native_meta(self, df: pd.DataFrame) -> Any:
         return df
 
+    def template(self, dispatcher: Dispatcher, sig: Tuple[type], func: Callable):
+        # Ensure signature is a tuple, then map to the new types
+        sig = (sig,) if not isinstance(sig, tuple) else sig
+        sig = tuple(self.to_type(s) for s in sig)
+        dispatcher.add(sig, self.map(func))
+
     def map(self, func: Callable) -> Callable:
         def wrapper(_, df: Any, *args, **kwargs):
             # Generate a new partial function which only needs the input df
@@ -57,39 +65,24 @@ class MaterializerInterface(metaclass=InterfaceMeta):
 
 class Materializer():
     def __init__(self):
-        self._registry = {}
+        self.implementations = {}
 
     def __repr__(self):
-        out = "Dfender Materializer Registry\n\nImplementations: \n"
-        out += "\n".join([f"{k}: [{v.series}, {v.df}]" for k, v in self.registry.items()])
+        out = "Materializer Registry\n\nImplementations: \n"
+        out += "\n".join([f"{k}: [{v.series}, {v.df}]" for k, v in self.implementations.items()])
         return out
 
-    def dispatcher(self, func: Callable) -> type[MethodDispatcher]:
-        dispatcher = MethodDispatcher(func.__name__)
+    def register(self, module):
+        def decorator(func: Callable):
+            # Check if the module is importable, and if so register it
+            found = importlib.util.find_spec(module) is not None
+            if found:
+                self.implementations[module] = func()
+            return func
+        return decorator
 
-        # Get the function type hints to determine how we are going to dispatch
-        if len(func.__annotations__) < 1:
-            # TODO: Add a better check for type-hinted inputs
-            raise ValueError(f"Function \"{func.__name__}\" does not have required type hints")
-        sig = next(iter(get_type_hints(func).values()))
-
-        # Base implementation
-        dispatcher.register(sig)(func)
-
-        # Distributed implementations
-        for r in self.registry.values():
-            dispatcher.register(r.to_type(sig))(r.map(func))
-
-        return dispatcher
-
-    def register(self, name: str) -> Callable:
-        def _register(mat: type[MaterializerInterface]):
-            self.registry[name] = mat()
-            return mat
-        return _register
-    
-    @property
-    def registry(self):
-        return self._registry
+    def template(self, dispatcher: Dispatcher, sig: Union[type, Tuple[type], List[type]], func: Callable):
+        for imp in self.implementations.values():
+            imp.template(dispatcher, sig, func)
 
 materializer = Materializer()

@@ -6,7 +6,6 @@ import dask.dataframe as dd
 from interface_meta import override
 from .core import materializer, MaterializerInterface
 
-@materializer.register('dask')
 class DaskMaterializer(MaterializerInterface):
     @property
     def series(self) -> type[dd.Series]:
