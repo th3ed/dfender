@@ -50,7 +50,9 @@ class MaterializerInterface(metaclass=InterfaceMeta):
     def map(self, func: Callable) -> Callable:
         def wrapper(_, df: Any, *args, **kwargs):
             # Generate a new partial function which only needs the input df
-            func_ = partial(func, self, *args, **kwargs)
+            def func_(df):
+                return func(self, df, *args, **kwargs)
+            # func_ = partial(func, self, *args, **kwargs)
 
             # Get the pandas equivalent metadata to pass to the function
             meta_in = self.pandas_meta(df)
