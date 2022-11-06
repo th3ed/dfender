@@ -25,7 +25,7 @@ class DaskMaterializer(MaterializerInterface):
 
     @override
     def pandas_meta(self, df: Union[dd.Series, dd.DataFrame]) -> Union[pd.Series, pd.DataFrame]:
-        return df._meta
+        return df._meta_nonempty
 
     @override
     def native_meta(self, df: Union[pd.Series, pd.DataFrame]) -> Union[pd.Series, pd.DataFrame]:
